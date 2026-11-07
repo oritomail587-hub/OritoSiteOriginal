@@ -38,7 +38,6 @@ function checkVpnIp(ip) {
 app.get('/', async (req, res) => {
     let clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress;
 
-    // Lokalde test ederken VPN ekranını görmek istiyorsan burayı geçici olarak 'true' yapabilirsin:
     const isUsingVpn = await checkVpnIp(clientIp);
 
     res.send(`
@@ -59,6 +58,7 @@ app.get('/', async (req, res) => {
                     justify-content: center;
                     align-items: center;
                     height: 100vh;
+                    cursor: pointer; /* Sayfanın herhangi bir yerine tıklandığını belli eder */
                 }
                 
                 /* VPN Engel Ekranı */
@@ -94,6 +94,27 @@ app.get('/', async (req, res) => {
                 #vpn-container p {
                     color: #ffcccc;
                     font-size: 1.1rem;
+                }
+
+                /* Ses Açma Uyarısı (Tarayıcı engeline takılmamak için şık bir buton) */
+                #sound-prompt {
+                    position: fixed;
+                    top: 20px;
+                    z-index: 10000;
+                    background: rgba(0, 255, 204, 0.2);
+                    border: 2px solid #00ffcc;
+                    color: #00ffcc;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+                    animation: pulse 1.5s infinite;
+                }
+
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.03); }
+                    100% { transform: scale(1); }
                 }
 
                 /* Açılış Videosu ve Yükleme Ekranı */
@@ -197,17 +218,20 @@ app.get('/', async (req, res) => {
         </head>
         <body>
 
-            <!-- VPN / Proxy Uyarı Ekranı ve VPN.mp3 Ses Dosyası -->
+            <!-- Ses Açma Bildirimi -->
+            <div id="sound-prompt">🔊 Müziği Başlatmak İçin Ekrana Tıklayın!</div>
+
+            <!-- VPN / Proxy Uyarı Ekranı ve VPN.mp3 -->
             <div id="vpn-container">
-                <audio id="vpnAudio" src="/VPN.mp3" autoplay loop></audio>
+                <audio id="vpnAudio" src="/VPN.mp3" loop></audio>
                 <img src="/VPN.png" alt="VPN Tespit Edildi">
                 <h2>Erişim Engellendi</h2>
                 <p>Lütfen VPN veya proxy'yi kapatınız!</p>
             </div>
 
-            <!-- Açılış Videosu ve Yükleme Ekranı -->
+            <!-- Açılış Videosu (Start.mp4 - Kendi Sesiyle) -->
             <div id="intro-container">
-                <video id="introVideo" autoplay playsinline preload="auto">
+                <video id="introVideo" playsinline preload="auto">
                     <source src="/Start.mp4" type="video/mp4">
                 </video>
                 
@@ -217,7 +241,7 @@ app.get('/', async (req, res) => {
                 </div>
             </div>
 
-            <!-- Giriş / Kayıt Olma Paneli -->
+            <!-- Giriş / Kayıt Paneli -->
             <div id="main-content">
                 <h1 id="form-title">Giriş Yap</h1>
                 <form id="authForm" onsubmit="handleAuth(event)">
@@ -238,33 +262,30 @@ app.get('/', async (req, res) => {
             </div>
 
             <script>
-                // VPN Müziğini Otomatik / Tıklama ile Başlatma Garantisi
-                window.addEventListener('load', () => {
-                    const vpnAudio = document.getElementById('vpnAudio');
-                    if (vpnAudio) {
-                        vpnAudio.play().catch(() => {
-                            document.addEventListener('click', () => {
-                                vpnAudio.play();
-                            }, { once: true });
-                        });
-                    }
-                });
-
                 const video = document.getElementById('introVideo');
+                const vpnAudio = document.getElementById('vpnAudio');
+                const soundPrompt = document.getElementById('sound-prompt');
                 const introContainer = document.getElementById('intro-container');
                 const mainContent = document.getElementById('main-content');
+                const isVpnActive = ${isUsingVpn};
 
-                function playWithAudio() {
-                    if (video) {
+                // Kullanıcı ekrana herhangi bir yere tıkladığı an ses/müzik anında patlar!
+                function startAudioOnUserInteraction() {
+                    soundPrompt.style.display = 'none'; // Uyarı yazısını kaldır
+
+                    if (isVpnActive && vpnAudio) {
+                        vpnAudio.volume = 1.0;
+                        vpnAudio.play().catch(e => console.log("VPN ses hatası:", e));
+                    } else if (video) {
                         video.muted = false;
                         video.volume = 1.0;
-                        video.play().catch(err => console.log("Ses hatası:", err));
+                        video.play().catch(e => console.log("Video ses hatası:", e));
                     }
                 }
 
-                window.addEventListener('load', playWithAudio);
-                document.addEventListener('click', playWithAudio, { once: true });
-                document.addEventListener('keydown', playWithAudio, { once: true });
+                // Tıklama veya klavye tuşuna basıldığı an müziği çalıştır
+                window.addEventListener('click', startAudioOnUserInteraction, { once: true });
+                window.addEventListener('keydown', startAudioOnUserInteraction, { once: true });
 
                 if (video) {
                     video.onended = fadeOutIntro;
@@ -337,7 +358,7 @@ app.post('/api/register', (req, res) => {
     const existingUser = users.find(u => u.username === username);
     if (existingUser) return res.json({ success: false, message: 'Bu kullanıcı adı zaten var!' });
     users.push({ username, password });
-    res.json({ success: true, message: 'Kayıt başarılı! Şimdi giriş yapabilirsiniz.' });
+    res.json({ success: type = true, message: 'Kayıt başarılı! Şimdi giriş yapabilirsiniz.' });
 });
 
 app.post('/api/login', (req, res) => {
