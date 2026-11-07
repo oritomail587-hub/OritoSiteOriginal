@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -9,15 +8,12 @@ app.use(express.json());
 
 const users = [];
 
-// Gerçek IP adresi üzerinden VPN/Proxy Kontrolü yapan yardımcı fonksiyon
 function checkVpnIp(ip) {
     return new Promise((resolve) => {
-        // Yerel testlerde (localhost / 127.0.0.1) VPN engeline takılmasın
         if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.')) {
             return resolve(false);
         }
 
-        // ip-api.com üzerinden IP türünü sorgula (proxy, hosting, vpn kontrolü)
         const url = `http://ip-api.com/json/${ip}?fields=status,proxy,hosting`;
         
         http.get(url, (res) => {
@@ -27,7 +23,6 @@ function checkVpnIp(ip) {
                 try {
                     const result = JSON.parse(data);
                     if (result.status === 'success') {
-                        // Eğer IP bir Proxy/VPN veya Veri Merkezi (Hosting) IP'si ise true döner
                         resolve(result.proxy || result.hosting);
                     } else {
                         resolve(false);
@@ -41,10 +36,9 @@ function checkVpnIp(ip) {
 }
 
 app.get('/', async (req, res) => {
-    // Render/Cloudflare arkasındaki gerçek kullanıcı IP'sini al
     let clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.socket.remoteAddress;
 
-    // IP'nin VPN/Proxy olup olmadığını kontrol et
+    // Lokalde test ederken VPN ekranını görmek istiyorsan burayı geçici olarak 'true' yapabilirsin:
     const isUsingVpn = await checkVpnIp(clientIp);
 
     res.send(`
@@ -203,8 +197,9 @@ app.get('/', async (req, res) => {
         </head>
         <body>
 
-            <!-- VPN / Proxy Uyarı Ekranı -->
+            <!-- VPN / Proxy Uyarı Ekranı ve VPN.mp3 Ses Dosyası -->
             <div id="vpn-container">
+                <audio id="vpnAudio" src="/VPN.mp3" autoplay loop></audio>
                 <img src="/VPN.png" alt="VPN Tespit Edildi">
                 <h2>Erişim Engellendi</h2>
                 <p>Lütfen VPN veya proxy'yi kapatınız!</p>
@@ -243,6 +238,18 @@ app.get('/', async (req, res) => {
             </div>
 
             <script>
+                // VPN Müziğini Otomatik / Tıklama ile Başlatma Garantisi
+                window.addEventListener('load', () => {
+                    const vpnAudio = document.getElementById('vpnAudio');
+                    if (vpnAudio) {
+                        vpnAudio.play().catch(() => {
+                            document.addEventListener('click', () => {
+                                vpnAudio.play();
+                            }, { once: true });
+                        });
+                    }
+                });
+
                 const video = document.getElementById('introVideo');
                 const introContainer = document.getElementById('intro-container');
                 const mainContent = document.getElementById('main-content');
@@ -268,7 +275,7 @@ app.get('/', async (req, res) => {
                     if (introContainer) {
                         introContainer.style.opacity = '0';
                         setTimeout(() => {
-                            introContainer.remove(); // Video bittiğinde tamamen silinir
+                            introContainer.remove();
                             mainContent.style.display = 'block';
                         }, 800);
                     }
